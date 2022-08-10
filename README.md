@@ -1,6 +1,8 @@
-# NEO System: An Online Candlestick based Trend Following Backtesting System
+# NEO System: An Online Candlestick based High Efficiency Trend Following Backtesting System
 
 Numba-based Evaluation Online System, short for NEO System, named after *The One* Neo from *The Matrix*
+
+The NEO System utilizes the power of Numba jit compiling, making backtesting flexible and efficient
 
 ## Backtest a Bollinger Band breakout strategy
 
