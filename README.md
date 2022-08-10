@@ -42,8 +42,6 @@ df = df[df['candle_begin_time'] >= START_DATE].reset_index(drop=True)
 Finally, backtest with NEO System
 
 ``` python
-%%time
-
 # Initalize the backtesting simulator
 simulator = SingleFutureSimulator(
     init_capital=INIT_CAPITAL, 
