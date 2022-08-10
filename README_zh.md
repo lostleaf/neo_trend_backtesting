@@ -1,4 +1,4 @@
-# NEO 系统：一个高效的 K 线级在线趋势追踪回测视通
+# NEO 系统：一个高效的 K 线级在线趋势追踪回测系统
 
 Numba-based Evaluation Online System, 缩写为 NEO System, 取救世主 NEO 之名
 
