@@ -4,7 +4,9 @@ Numba-based Evaluation Online System, short for NEO System, named after *The One
 
 ## Backtest a Bollinger Band breakout strategy
 
-The correlated jupyter notebook is here
+The correlated jupyter notebook is [here](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/boll.ipynb)
+
+And the `BollingStrategy` is [here](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/bolling.py)
 
 First, specify the parameters
 
