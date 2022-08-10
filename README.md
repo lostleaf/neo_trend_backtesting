@@ -8,7 +8,7 @@ The NEO System utilizes the power of Numba jit compiling, making backtesting fle
 
 The correlated jupyter notebook is [here](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/boll.ipynb)
 
-And the `BollingStrategy` is [here](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/bolling.py)
+And the `BollingStrategy` is [here](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/boll.py)
 
 First, specify the parameters
 
