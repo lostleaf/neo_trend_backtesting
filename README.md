@@ -27,7 +27,7 @@ COMM_RATE = 6e-4  # Trading cost 0.06%
 LIQUI_RATE = 5e-3  # Maintenance Margin rate 0.5%, will liquidate if lower
 ```
 
-Then, load the candlesticks and compute the factors
+Then, load the candlesticks and compute the factors. `df` here is a pandas DataFrame of timestamped OHLCV candlestick data
 
 ``` python
 df = pd.read_feather('../candle_1h.fea')
