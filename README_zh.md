@@ -25,7 +25,7 @@ INIT_CAPITAL = 1e5  # 初始资金，10万
 LEVERAGE = 1  # 使用1倍杠杆
 FACE_VALUE = 0.01  # 合约面值 0.01
 COMM_RATE = 6e-4  # 交易成本万分之 6
-LIQUI_RATE = 5e-3  # 爆仓保证金率千分之 3
+LIQUI_RATE = 5e-3  # 爆仓保证金率千分之 5
 ```
 
 然后，读入 K 线行情并计算技术指标
