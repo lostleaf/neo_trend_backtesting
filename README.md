@@ -28,7 +28,9 @@ Then, load the candlesticks and compute the factors
 ``` python
 df = pd.read_feather('../candle_1h.fea')
 
-upper, median, lower = ta.BBANDS(df['close'], timeperiod=N, nbdevup=B, nbdevdn=B, matype=ta.MA_Type.SMA)
+upper, median, lower = ta.BBANDS(
+    df['close'], 
+    timeperiod=N, nbdevup=B, nbdevdn=B, matype=ta.MA_Type.SMA)
 
 df['upper'] = upper
 df['median'] = median
