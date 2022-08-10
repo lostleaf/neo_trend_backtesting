@@ -8,7 +8,7 @@ NEO 系统使用了基于 Numba 的 jit 编译，同时保证了回测的灵活�
 
 Jupyter notebook [在这里](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/boll.ipynb)
 
-`BollingStrategy` 策略实现[在这里](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/bolling.py)
+`BollingStrategy` 策略实现[在这里](https://github.com/lostleaf/neo_trend_backtesting/blob/master/strategy_example/boll.py)
 
 首先，定义参数
 
