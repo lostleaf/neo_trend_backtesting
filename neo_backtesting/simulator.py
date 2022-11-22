@@ -62,8 +62,8 @@ class SingleFutureSimulator:
 
 
 @jitclass([
-    ['equity', nb.float64],  # 账户权益，可以设置为 10 个币
-    ['face_value', nb.float64],  # 合约面值，或币安最小下单单位
+    ['equity', nb.float64],  # 账户权益，可以设置为 10 个
+    ['face_value', nb.float64],  # 合约面值，通常为 10 或 100 美元
     ['comm_rate', nb.float64],  # 手续费/交易成本，可设置为万分之6
     ['liqui_rate', nb.float64],  # 爆仓保证金率，千分之5
     ['pre_close', nb.float64],  # 上根k线的收盘价
@@ -72,7 +72,7 @@ class SingleFutureSimulator:
 ])
 class SingleInverseFutureSimulator:
     """
-    正向(币本位)合约回测模拟
+    反向合约回测模拟
     """
 
     def __init__(self, init_capital, face_value, comm_rate, liqui_rate, init_pos=0):
