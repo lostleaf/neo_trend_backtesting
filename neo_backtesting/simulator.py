@@ -17,7 +17,7 @@ class SingleFutureSimulator:
     正向合约回测模拟
     """
 
-    def __init__(self, init_capital, face_value, comm_rate, liqui_rate, init_pos=0):
+    def __init__(self, init_capital, face_value, comm_rate, liqui_rate, init_pos):
         self.equity = init_capital
         self.face_value = face_value
         self.comm_rate = comm_rate
@@ -31,7 +31,11 @@ class SingleFutureSimulator:
         self.target_pos = target_pos
 
     def simulate_bar(self, candle):
-        op, hi, lo, cl, vol = candle
+        op = candle['open']
+        hi = candle['high']
+        lo = candle['low']
+        cl = candle['close']
+        
         if np.isnan(self.pre_close):
             self.pre_close = op
 
@@ -75,7 +79,7 @@ class SingleInverseFutureSimulator:
     反向合约回测模拟
     """
 
-    def __init__(self, init_capital, face_value, comm_rate, liqui_rate, init_pos=0):
+    def __init__(self, init_capital, face_value, comm_rate, liqui_rate, init_pos):
         self.equity = init_capital
         self.face_value = face_value
         self.comm_rate = comm_rate

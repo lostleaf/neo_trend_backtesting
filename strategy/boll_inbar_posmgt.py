@@ -4,30 +4,26 @@ import pandas as pd
 import talib as ta
 from numba.experimental import jitclass
 
+FCOLS = ['upper', 'median', 'lower']
 
-def boll_factor_cross_timeframe(df_1m: pd.DataFrame, df_1h: pd.DataFrame, n, b):
-    """
-    跨周期的布林带因子
-    先在1小时线（大周期）上计算布林带，然后填充到1分钟（小周期）上
-    每根1分钟线均使用最近的已闭合的1小时线上中下轨
-    """
-    upper, median, lower = ta.BBANDS(df_1h['close'], timeperiod=n, nbdevup=b, nbdevdn=b, matype=ta.MA_Type.SMA)
-    df_1h['upper'] = upper
-    df_1h['median'] = median
-    df_1h['lower'] = lower
 
-    # 根据 k 线结束时间对齐
-    df_1h['candle_end_time'] = df_1h['candle_begin_time'] + pd.Timedelta(hours=1)
-    df_1m['candle_end_time'] = df_1m['candle_begin_time'] + pd.Timedelta(minutes=1)
+def factor(candles, params):
+    # 取 K 线和参数
+    df_1m = candles['1m']
+    df_long = candles[params['itl']]
+    n = params['n']
+    b = params['b']
 
-    factor_cols = ['upper', 'lower', 'median']
-    df = df_1m.join(df_1h.set_index('candle_end_time')[factor_cols], on='candle_end_time')
+    # 计算布林带
+    upper, median, lower = ta.BBANDS(df_long['close'], timeperiod=n, nbdevup=b, nbdevdn=b, matype=ta.MA_Type.SMA)
+    df_fac = pd.DataFrame({'upper': upper, 'median': median, 'lower': lower}, index=df_long['candle_end_time'])
 
-    # 向后填充分钟线上中下轨
-    for col in factor_cols:
-        df[col].ffill(inplace=True)
+    # 将布林带填充到 1 分钟线
+    df_fac = df_1m.join(df_fac, on='candle_end_time')
+    for col in FCOLS:
+        df_fac[col].ffill(inplace=True)
 
-    return df
+    return df_fac
 
 
 @jitclass([
@@ -44,7 +40,7 @@ def boll_factor_cross_timeframe(df_1m: pd.DataFrame, df_1h: pd.DataFrame, n, b):
     ['prev_median', nb.float64],  # 上根k线均线
     ['prev_close', nb.float64]  # 上根k线收盘价
 ])
-class BollingPosMgtStrategy:
+class Strategy:
 
     def __init__(self, max_leverage, max_loss, face_value, stop_pct, stop_close_pct):
         self.max_leverage = max_leverage
@@ -134,3 +130,12 @@ class BollingPosMgtStrategy:
         self.prev_median = median
 
         return target_pos
+
+
+def get_default_factor_params_list():
+    params = []
+    for interval in ['1h', '30m']:  # 长周期
+        for n in range(10, 101, 10):  # 均线周期
+            for b in [1.5, 1.8, 2, 2.2, 2.5]:  # 布林带宽度
+                params.append({'itl': interval, 'n': n, 'b': b})
+    return params

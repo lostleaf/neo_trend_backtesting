@@ -1,6 +1,35 @@
 import numba as nb
 import numpy as np
+import pandas as pd
+import talib as ta
 from numba.experimental import jitclass
+
+FCOLS = ['upper', 'median', 'lower']
+
+
+def factor(candles, params):
+    # 取 K 线和参数
+    df_1m = candles['1m']
+    df_long = candles[params['itl']]
+    n = params['n']
+    b = params['b']
+
+    # 计算布林带
+    upper, median, lower = ta.BBANDS(df_long['close'], timeperiod=n, nbdevup=b, nbdevdn=b, matype=ta.MA_Type.SMA)
+    df_fac = pd.DataFrame({
+        'upper': upper,
+        'median': median,
+        'lower': lower,
+        'candle_end_time': df_long['candle_end_time']
+    })
+
+    # 填充到1分钟
+    df_fac.set_index('candle_end_time', inplace=True)
+    df_fac = df_1m.join(df_fac, on='candle_end_time')
+    for col in FCOLS:
+        df_fac[col].ffill(inplace=True)
+
+    return df_fac
 
 
 @jitclass([
@@ -11,7 +40,7 @@ from numba.experimental import jitclass
     ['prev_median', nb.float64],  # 上根k线均线
     ['prev_close', nb.float64]  # 上根k线收盘价
 ])
-class BollingStrategy:
+class Strategy:
 
     def __init__(self, leverage, face_value):
         self.leverage = leverage
@@ -23,8 +52,10 @@ class BollingStrategy:
         self.prev_close = np.nan
 
     def on_bar(self, candle, factors, pos, equity):
-        op, hi, lo, cl, vol = candle
-        upper, lower, median = factors
+        cl = candle['close']
+        upper = factors['upper']
+        lower = factors['lower']
+        median = factors['median']
 
         # 默认保持原有仓位
         target_pos = pos
@@ -53,3 +84,20 @@ class BollingStrategy:
         self.prev_median = median
 
         return target_pos
+
+
+def get_default_factor_params_list():
+    params = []
+    for interval in ['1h', '30m']:  # 长周期
+        for n in range(10, 101, 10):  # 均线周期
+            for b in [1.5, 1.8, 2, 2.2, 2.5]:  # 布林带宽度
+                params.append({'itl': interval, 'n': n, 'b': b})
+    return params
+
+
+def get_default_strategy_params_list():
+    params = []
+    for lev in [1, 1.5]:
+        params.append({'leverage': lev})
+
+    return params
