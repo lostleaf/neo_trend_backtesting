@@ -89,6 +89,10 @@ class Backtester:
         if self.candles is None:
             self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}
 
+    def load_candles(self):
+        if self.candles is None:
+            self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}
+
     def run_detailed(self, start_date, end_date, init_capital, face_value, factor_params, strategy_params):
         self.load_candles()
         df_fac, candles, factors = calc_factors(self.candles, self.stra_module, factor_params, start_date, end_date)
@@ -110,7 +114,6 @@ class Backtester:
                 data.append(r)
         return pd.DataFrame.from_records(data)
 
-
     def _run_backtest(self, candles, factors, init_capital, face_value, strategy_params):
         inject_strategy_params(self.stra_module, strategy_params, [('face_value', face_value),
                                                                    ('init_capital', init_capital)])
@@ -118,11 +121,19 @@ class Backtester:
         pos, equity = self.backtest_runner(candles, factors, strategy)
         return pos, equity
 
-def run_gridsearch(stra_module, candle_paths, contract_type, simulator_params, start_date, end_date, 
-                    init_capital, face_value, n_proc=None):
+
+def run_gridsearch(stra_module,
+                   candle_paths,
+                   contract_type,
+                   simulator_params,
+                   start_date,
+                   end_date,
+                   init_capital,
+                   face_value,
+                   n_proc=None):
     if n_proc is None:
         n_proc = max(os.cpu_count() - 1, 1)
-    
+
     fparams_list = stra_module.get_default_factor_params_list()
     sparams_list = stra_module.get_default_strategy_params_list()
 
@@ -133,23 +144,21 @@ def run_gridsearch(stra_module, candle_paths, contract_type, simulator_params, s
         n_tasks = n // n_proc
         if i < n % n_proc:
             n_tasks += 1
-        fparams_seqs.append(fparams_list[j : j + n_tasks])
+        fparams_seqs.append(fparams_list[j:j + n_tasks])
         j += n_tasks
 
     def _search(fl):
-        backtester = Backtester(
-            candle_paths=candle_paths, 
-            contract_type=contract_type, 
-            simulator_params=simulator_params, 
-            stra_module=stra_module)
-        df = backtester.run_multi(
-            start_date=start_date,
-            end_date=end_date,
-            init_capital=init_capital,
-            face_value=face_value,
-            fparams_list=fl,
-            sparams_list=sparams_list
-        )
+        backtester = Backtester(candle_paths=candle_paths,
+                                contract_type=contract_type,
+                                simulator_params=simulator_params,
+                                stra_module=stra_module)
+        df = backtester.run_multi(start_date=start_date,
+                                  end_date=end_date,
+                                  init_capital=init_capital,
+                                  face_value=face_value,
+                                  fparams_list=fl,
+                                  sparams_list=sparams_list)
         return df
+
     dfs = Parallel(n_jobs=n_proc)(delayed(_search)(fl) for fl in fparams_seqs)
     return pd.concat(dfs, ignore_index=True)
