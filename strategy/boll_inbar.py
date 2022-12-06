@@ -89,7 +89,7 @@ class Strategy:
 def get_default_factor_params_list():
     params = []
     for interval in ['1h', '30m']:  # 长周期
-        for n in range(10, 101, 10):  # 均线周期
+        for n in range(10, 501, 5):  # 均线周期
             for b in [1.5, 1.8, 2, 2.2, 2.5]:  # 布林带宽度
                 params.append({'itl': interval, 'n': n, 'b': b})
     return params
