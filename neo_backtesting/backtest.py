@@ -81,20 +81,12 @@ class Backtester:
     def __init__(self, candle_paths, contract_type, simulator_params, stra_module):
         self.stra_module = stra_module
         self.candle_paths = candle_paths
-        self.candles = None
+        self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}
         simu_init = get_simulator_initializer(contract_type, simulator_params)
         self.backtest_runner = get_backtest_runner(stra_module, simu_init)
     
-    def load_candles(self):
-        if self.candles is None:
-            self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}
-
-    def load_candles(self):
-        if self.candles is None:
-            self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}
 
     def run_detailed(self, start_date, end_date, init_capital, face_value, factor_params, strategy_params):
-        self.load_candles()
         df_fac, candles, factors = calc_factors(self.candles, self.stra_module, factor_params, start_date, end_date)
         pos, equity = self._run_backtest(candles, factors, init_capital, face_value, strategy_params)
         df_fac['pos'] = pos
@@ -102,7 +94,6 @@ class Backtester:
         return df_fac
 
     def run_multi(self, start_date, end_date, init_capital, face_value, fparams_list, sparams_list):
-        self.load_candles()
         data = []
         for factor_params in fparams_list:
             _, candles, factors = calc_factors(self.candles, self.stra_module, factor_params, start_date, end_date)
