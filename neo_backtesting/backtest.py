@@ -16,6 +16,7 @@ SIMULATOR_MAP = {'futures': SingleFutureSimulator, 'inverse_futures': SingleInve
 
 
 def get_backtest_runner(stra, simu_init):
+    # 推断参数 numba 类型
     candle_type = np.dtype([('open', np.float64), ('high', np.float64), ('low', np.float64), ('close', np.float64),
                             ('volume', np.float64)])
     candle_type = nb.from_dtype(candle_type)
@@ -25,6 +26,7 @@ def get_backtest_runner(stra, simu_init):
     strategy_type = as_numba_type(stra.Strategy)
     return_type = as_numba_type(Tuple[nb.int64[:], nb.float64[:]])
 
+    # 定义回测函数，这里会直接 jit 编译
     @nb.njit(return_type(candle_type[:], factor_type[:], strategy_type))
     def _run_backtest(candles, factors, stra):
         n = candles.shape[0]  # k 线数量
@@ -42,6 +44,7 @@ def get_backtest_runner(stra, simu_init):
             simu.adjust_pos(target_pos)  # 记录目标持仓，下根 k 线 open 时刻调仓
         return pos, equity
 
+    # 返回 jit 编译好的回测函数
     return _run_backtest
 
 
@@ -58,18 +61,20 @@ def get_simulator_initializer(contract_type, simulator_params):
         simulator = simu_type(init_capital, face_value, comm_rate, liqui_rate, init_pos)
         return simulator
 
+    # 返回初始化模拟器的 jit 函数
     return simulator_initializer
 
 
 def calc_factors(candles, stra_module, factor_params, start_date, end_date):
-    df_fac: pd.DataFrame = stra_module.factor(candles, factor_params)
+    df_fac: pd.DataFrame = stra_module.factor(candles, factor_params)  # 计算因子
     df_fac = df_fac[(df_fac['candle_begin_time'] >= start_date) & (df_fac['candle_begin_time'] <= end_date)]
-    factors = transform_np_struct(df_fac[stra_module.FCOLS])
-    candles = transform_candle_np_struct(df_fac)
+    factors = transform_np_struct(df_fac[stra_module.FCOLS])  # 因子 numpy structured array
+    candles = transform_candle_np_struct(df_fac)  # K线 numpy structured array
     return df_fac, candles, factors
 
 
 def inject_strategy_params(stra_module, strategy_params, inject):
+    # 为 strategy_params 注入 init_capital 和 face_value（如有需要）
     stra_init_params = inspect.signature(stra_module.Strategy.__init__).parameters
     for pname, pval in inject:
         if pname in stra_init_params:
@@ -79,12 +84,14 @@ def inject_strategy_params(stra_module, strategy_params, inject):
 class Backtester:
 
     def __init__(self, candle_paths, contract_type, simulator_params, stra_module):
-        self.stra_module = stra_module
+        self.stra_module = stra_module  # 要回测的策略
         self.candle_paths = candle_paths
-        self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}
+
+        self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}  # 读取K线数据
+
+        # jit 编译回测函数
         simu_init = get_simulator_initializer(contract_type, simulator_params)
         self.backtest_runner = get_backtest_runner(stra_module, simu_init)
-    
 
     def run_detailed(self, start_date, end_date, init_capital, face_value, factor_params, strategy_params):
         df_fac, candles, factors = calc_factors(self.candles, self.stra_module, factor_params, start_date, end_date)
