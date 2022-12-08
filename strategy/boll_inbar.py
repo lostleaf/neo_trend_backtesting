@@ -34,48 +34,46 @@ def factor(candles, params):
 
 @jitclass([
     ['leverage', nb.float64],  # 杠杆率 
-    ['face_value', nb.float64],  # 合约面值
     ['prev_upper', nb.float64],  # 上根k线上轨
     ['prev_lower', nb.float64],  # 上根k线下轨
     ['prev_median', nb.float64],  # 上根k线均线
     ['prev_close', nb.float64]  # 上根k线收盘价
 ])
-class Strategy:
+class StrategyPosition:
 
-    def __init__(self, leverage, face_value):
+    def __init__(self, leverage):
         self.leverage = leverage
-        self.face_value = face_value
 
         self.prev_upper = np.nan
         self.prev_lower = np.nan
         self.prev_median = np.nan
         self.prev_close = np.nan
 
-    def on_bar(self, candle, factors, pos, equity):
+    def on_bar(self, candle, factors, expo, equity_usd):
         cl = candle['close']
         upper = factors['upper']
         lower = factors['lower']
         median = factors['median']
 
         # 默认保持原有仓位
-        target_pos = pos
+        tar_expo = expo
 
         if not np.isnan(self.prev_close):
             # 做空或无仓位，上穿上轨，做多
-            if pos <= 0 and cl > upper and self.prev_close <= self.prev_upper:
-                target_pos = int(equity * self.leverage / cl / self.face_value)
+            if expo <= 0 and cl > upper and self.prev_close <= self.prev_upper:
+                tar_expo = equity_usd * self.leverage / cl
 
             # 做多或无仓位，下穿下轨，做空
-            elif pos >= 0 and cl < lower and self.prev_close >= self.prev_lower:
-                target_pos = -int(equity * self.leverage / cl / self.face_value)
+            elif expo >= 0 and cl < lower and self.prev_close >= self.prev_lower:
+                tar_expo = -equity_usd * self.leverage / cl
 
             # 做多，下穿中轨，平仓
-            elif pos > 0 and cl < median and self.prev_close >= self.prev_median:
-                target_pos = 0
+            elif expo > 0 and cl < median and self.prev_close >= self.prev_median:
+                tar_expo = 0
 
             # 做空，上穿中轨，平仓
-            elif pos < 0 and cl > median and self.prev_close <= self.prev_median:
-                target_pos = 0
+            elif expo < 0 and cl > median and self.prev_close <= self.prev_median:
+                tar_expo = 0
 
         # 更新上根K线数据
         self.prev_upper = upper
@@ -83,21 +81,38 @@ class Strategy:
         self.prev_close = cl
         self.prev_median = median
 
-        return target_pos
+        return tar_expo
+
+
+@jitclass
+class Strategy:
+    stra_pos: StrategyPosition
+    face_value: float
+
+    def __init__(self, leverage, face_value):
+        self.stra_pos = StrategyPosition(leverage)
+        self.face_value = face_value
+
+    def on_bar(self, candle, factors, pos, equity):
+        expo = pos * self.face_value
+        tar_expo = self.stra_pos.on_bar(candle, factors, expo, equity)
+
+        tarpos_cont = int(tar_expo / self.face_value)
+        return tarpos_cont
 
 
 def get_default_factor_params_list():
     params = []
     for interval in ['1h', '30m']:  # 长周期
-        for n in range(10, 501, 5):  # 均线周期
-            for b in [1.5, 1.8, 2, 2.2, 2.5]:  # 布林带宽度
+        for n in range(10, 201, 10):  # 均线周期
+            for b in [1.8, 2, 2.2]:  # 布林带宽度
                 params.append({'itl': interval, 'n': n, 'b': b})
     return params
 
 
 def get_default_strategy_params_list():
     params = []
-    for lev in [1, 1.5]:
+    for lev in [1]:
         params.append({'leverage': lev})
 
     return params
