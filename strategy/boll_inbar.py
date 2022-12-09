@@ -33,15 +33,17 @@ def factor(candles, params):
 
 
 @jitclass([
-    ['leverage', nb.float64],  # 杠杆率 
     ['prev_upper', nb.float64],  # 上根k线上轨
     ['prev_lower', nb.float64],  # 上根k线下轨
     ['prev_median', nb.float64],  # 上根k线均线
-    ['prev_close', nb.float64]  # 上根k线收盘价
+    ['prev_close', nb.float64],  # 上根k线收盘价
+    ['exposure', nb.float64],  # 风险敞口
+    ['leverage', nb.float64]
 ])
-class StrategyPosition:
+class Exposure:
 
     def __init__(self, leverage):
+        self.exposure = 0
         self.leverage = leverage
 
         self.prev_upper = np.nan
@@ -49,31 +51,28 @@ class StrategyPosition:
         self.prev_median = np.nan
         self.prev_close = np.nan
 
-    def on_bar(self, candle, factors, expo, equity_usd):
+    def on_bar(self, candle, factors, equity_usd):
         cl = candle['close']
         upper = factors['upper']
         lower = factors['lower']
         median = factors['median']
 
-        # 默认保持原有仓位
-        tar_expo = expo
-
         if not np.isnan(self.prev_close):
             # 做空或无仓位，上穿上轨，做多
-            if expo <= 0 and cl > upper and self.prev_close <= self.prev_upper:
-                tar_expo = equity_usd * self.leverage / cl
+            if self.exposure <= 0 and cl > upper and self.prev_close <= self.prev_upper:
+                self.exposure = equity_usd * self.leverage / cl
 
             # 做多或无仓位，下穿下轨，做空
-            elif expo >= 0 and cl < lower and self.prev_close >= self.prev_lower:
-                tar_expo = -equity_usd * self.leverage / cl
+            elif self.exposure >= 0 and cl < lower and self.prev_close >= self.prev_lower:
+                self.exposure = -equity_usd * self.leverage / cl
 
             # 做多，下穿中轨，平仓
-            elif expo > 0 and cl < median and self.prev_close >= self.prev_median:
-                tar_expo = 0
+            elif self.exposure > 0 and cl < median and self.prev_close >= self.prev_median:
+                self.exposure = 0
 
             # 做空，上穿中轨，平仓
-            elif expo < 0 and cl > median and self.prev_close <= self.prev_median:
-                tar_expo = 0
+            elif self.exposure < 0 and cl > median and self.prev_close <= self.prev_median:
+                self.exposure = 0
 
         # 更新上根K线数据
         self.prev_upper = upper
@@ -81,24 +80,61 @@ class StrategyPosition:
         self.prev_close = cl
         self.prev_median = median
 
-        return tar_expo
+        return self.exposure
 
 
 @jitclass
 class Strategy:
-    stra_pos: StrategyPosition
+    stra_pos: Exposure
     face_value: float
+    leverage: float
+    pre_exposure: float
 
     def __init__(self, leverage, face_value):
-        self.stra_pos = StrategyPosition(leverage)
+        self.stra_pos = Exposure(leverage)
         self.face_value = face_value
+        self.pre_exposure = np.nan
 
     def on_bar(self, candle, factors, pos, equity):
-        expo = pos * self.face_value
-        tar_expo = self.stra_pos.on_bar(candle, factors, expo, equity)
+        if np.isnan(self.pre_exposure):
+            self.pre_exposure = pos * self.face_value
 
-        tarpos_cont = int(tar_expo / self.face_value)
-        return tarpos_cont
+        target_exposure = self.stra_pos.on_bar(candle, factors, equity)
+
+        # 风险敞口变化
+        if self.pre_exposure != target_exposure:
+            pos = int(target_exposure / self.face_value)
+            self.pre_exposure = target_exposure
+        return pos
+
+
+@jitclass
+class InverseStrategy:
+    stra_pos: Exposure
+    face_value: float
+    leverage: float
+    pre_exposure: float
+
+    def __init__(self, leverage, face_value):
+        self.stra_pos = Exposure(leverage)
+        self.face_value = face_value
+        self.pre_exposure = np.nan
+
+    def on_bar(self, candle, factors, pos, equity):
+        cl = candle['close']
+        eq_usd = equity * cl
+
+        if np.isnan(self.pre_exposure):
+            self.pre_exposure = equity + pos * self.face_value / cl
+
+        target_exposure = self.stra_pos.on_bar(candle, factors, eq_usd)
+        
+        # 风险敞口变化
+        if target_exposure != self.pre_exposure:
+            pos = int((target_exposure - equity) * cl / self.face_value)
+            self.pre_exposure = target_exposure
+
+        return pos
 
 
 def get_default_factor_params_list():

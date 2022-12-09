@@ -13,9 +13,16 @@ from util import read_candle_feather, transform_candle_np_struct, transform_np_s
 from .simulator import SingleFutureSimulator, SingleInverseFutureSimulator
 
 SIMULATOR_MAP = {'futures': SingleFutureSimulator, 'inverse_futures': SingleInverseFutureSimulator}
+STRATEGY_MAP = {'futures': 'Strategy', 'inverse_futures': 'InverseStrategy'}
 
 
-def get_backtest_runner(stra, simu_init):
+def get_strategy_class_by_contract_type(stra, contract_type):
+    return getattr(stra, STRATEGY_MAP[contract_type])
+
+
+def get_backtest_runner(stra, contract_type, simulator_params):
+    simu_init = get_simulator_initializer(contract_type, simulator_params)
+
     # 推断参数 numba 类型
     candle_type = np.dtype([('open', np.float64), ('high', np.float64), ('low', np.float64), ('close', np.float64),
                             ('volume', np.float64)])
@@ -23,7 +30,7 @@ def get_backtest_runner(stra, simu_init):
 
     factor_type = nb.from_dtype(np.dtype([(f, np.float64) for f in stra.FCOLS]))
 
-    strategy_type = as_numba_type(stra.Strategy)
+    strategy_type = as_numba_type(get_strategy_class_by_contract_type(stra, contract_type))
     return_type = as_numba_type(Tuple[nb.int64[:], nb.float64[:]])
 
     # 定义回测函数，这里会直接 jit 编译
@@ -73,9 +80,10 @@ def calc_factors(candles, stra_module, factor_params, start_date, end_date):
     return df_fac, candles, factors
 
 
-def inject_strategy_params(stra_module, strategy_params, inject):
+def inject_strategy_params(stra_module, contract_type, strategy_params, inject):
     # 为 strategy_params 注入 init_capital 和 face_value（如有需要）
-    stra_init_params = inspect.signature(stra_module.Strategy.__init__).parameters
+    strategy_cls = get_strategy_class_by_contract_type(stra_module, contract_type)
+    stra_init_params = inspect.signature(strategy_cls.__init__).parameters
     for pname, pval in inject:
         if pname in stra_init_params:
             strategy_params[pname] = pval
@@ -86,12 +94,12 @@ class Backtester:
     def __init__(self, candle_paths, contract_type, simulator_params, stra_module):
         self.stra_module = stra_module  # 要回测的策略
         self.candle_paths = candle_paths
+        self.contract_type = contract_type
 
         self.candles = {itl: read_candle_feather(path) for itl, path in self.candle_paths.items()}  # 读取K线数据
 
         # jit 编译回测函数
-        simu_init = get_simulator_initializer(contract_type, simulator_params)
-        self.backtest_runner = get_backtest_runner(stra_module, simu_init)
+        self.backtest_runner = get_backtest_runner(stra_module, contract_type, simulator_params)
 
     def run_detailed(self, start_date, end_date, init_capital, face_value, factor_params, strategy_params):
         df_fac, candles, factors = calc_factors(self.candles, self.stra_module, factor_params, start_date, end_date)
@@ -113,9 +121,9 @@ class Backtester:
         return pd.DataFrame.from_records(data)
 
     def _run_backtest(self, candles, factors, init_capital, face_value, strategy_params):
-        inject_strategy_params(self.stra_module, strategy_params, [('face_value', face_value),
-                                                                   ('init_capital', init_capital)])
-        strategy = self.stra_module.Strategy(**strategy_params)
+        inject_strategy_params(self.stra_module, self.contract_type, strategy_params, [('face_value', face_value),
+                                                                                       ('init_capital', init_capital)])
+        strategy = get_strategy_class_by_contract_type(self.stra_module, self.contract_type)(**strategy_params)
         pos, equity = self.backtest_runner(candles, factors, strategy)
         return pos, equity
 

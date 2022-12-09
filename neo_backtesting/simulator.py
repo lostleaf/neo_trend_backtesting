@@ -93,7 +93,10 @@ class SingleInverseFutureSimulator:
         self.target_pos = target_pos
 
     def simulate_bar(self, candle):
-        op, hi, lo, cl, vol = candle
+        op = candle['open']
+        hi = candle['high']
+        lo = candle['low']
+        cl = candle['close']
         if np.isnan(self.pre_close):
             self.pre_close = op
 
